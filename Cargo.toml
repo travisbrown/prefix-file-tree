@@ -1,0 +1,23 @@
+[package]
+name = "prefix-file-tree"
+authors = ["Travis Brown <travisrobertbrown@gmail.com>"]
+description = "Predictable file directory structures"
+homepage = "https://github.com/travisbrown/prefix-file-tree"
+repository = "https://github.com/travisbrown/prefix-file-tree"
+keywords = ["utility"]
+edition = "2024"
+license = "GPL-3.0-only"
+version = "0.1.0"
+
+[features]
+default = ["data-encoding"]
+data-encoding = ["dep:data-encoding"]
+
+[dependencies]
+data-encoding = { version = "2", optional = true }
+thiserror = "2"
+
+[dev-dependencies]
+hex = "0.4"
+md5 = "0.8"
+tempfile = "3"
