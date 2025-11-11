@@ -17,12 +17,13 @@ impl<const N: usize> Hex<N> {
 
 impl<const N: usize> Scheme for Hex<N> {
     type Name = [u8; N];
+    type NameRef<'a> = [u8; N];
 
     fn fixed_length() -> Option<usize> {
         Some(N * 2)
     }
 
-    fn name_to_string<'a>(&self, name: &'a Self::Name) -> Cow<'a, str> {
+    fn name_to_string<'a>(&self, name: Self::NameRef<'a>) -> Cow<'a, str> {
         bytes_to_string(self.case, name).into()
     }
 
@@ -64,8 +65,9 @@ impl AnyLengthHex {
 
 impl Scheme for AnyLengthHex {
     type Name = Vec<u8>;
+    type NameRef<'a> = &'a [u8];
 
-    fn name_to_string<'a>(&self, name: &'a Self::Name) -> Cow<'a, str> {
+    fn name_to_string<'a>(&self, name: Self::NameRef<'a>) -> Cow<'a, str> {
         bytes_to_string(self.case, name).into()
     }
 
@@ -153,7 +155,7 @@ mod tests {
         fn save<B: AsRef<[u8]> + Copy>(&self, bytes: B) -> Result<bool, Error> {
             let digest = md5::compute(bytes);
 
-            match self.tree.create_file(&digest.0)? {
+            match self.tree.create_file(digest.0)? {
                 Some(mut file) => {
                     file.write_all(bytes.as_ref())?;
 

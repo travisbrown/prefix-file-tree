@@ -22,13 +22,14 @@ impl<const N: usize> Base32<N> {
 
 impl<const N: usize> Scheme for Base32<N> {
     type Name = [u8; N];
+    type NameRef<'a> = [u8; N];
 
     fn fixed_length() -> Option<usize> {
         Some(N / 5 * 8)
     }
 
-    fn name_to_string<'a>(&self, name: &'a Self::Name) -> Cow<'a, str> {
-        BASE32.encode(name).into()
+    fn name_to_string<'a>(&self, name: Self::NameRef<'a>) -> Cow<'a, str> {
+        BASE32.encode(&name).into()
     }
 
     fn cmp_prefix_part(&self, a: &OsStr, b: &OsStr) -> Result<Ordering, Error> {
@@ -102,19 +103,19 @@ mod tests {
             .with_prefix_part_lengths(prefix_part_lengths)
             .build()?;
 
-        let mut file = tree.create_file(name_1)?.expect("Unexpected file");
+        let mut file = tree.create_file(*name_1)?.expect("Unexpected file");
 
         file.write_all(b"foo")?;
 
-        let file = tree.create_file(name_1)?;
+        let file = tree.create_file(*name_1)?;
 
         assert!(file.is_none());
 
-        let mut file = tree.create_file(name_2)?.expect("Unexpected file");
+        let mut file = tree.create_file(*name_2)?.expect("Unexpected file");
 
         file.write_all(b"bar")?;
 
-        let mut file = tree.create_file(name_3)?.expect("Unexpected file");
+        let mut file = tree.create_file(*name_3)?.expect("Unexpected file");
 
         file.write_all(b"qux")?;
 

@@ -43,7 +43,7 @@ impl<S: scheme::Scheme> Tree<S> {
     ///
     /// Note that this function ignores any configured extension constraint, or any extension at
     /// for a file with this file stem at the specified directory.
-    fn name_path(&self, name: &S::Name) -> Result<PathBuf, String> {
+    fn name_path(&self, name: S::NameRef<'_>) -> Result<PathBuf, String> {
         let name_string = self.scheme.name_to_string(name);
 
         if name_string.len() >= self.prefix_part_lengths_total().max(1) {
@@ -66,7 +66,7 @@ impl<S: scheme::Scheme> Tree<S> {
     }
 
     /// Return the path through the tree for the given name, including any fixed extension.
-    pub fn path(&self, name: &S::Name) -> Result<PathBuf, String> {
+    pub fn path(&self, name: S::NameRef<'_>) -> Result<PathBuf, String> {
         let mut name_path = self.name_path(name)?;
 
         if let Some(constraint::Extension::Fixed(extension)) = &self.extension_constraint {
@@ -84,7 +84,7 @@ impl<S: scheme::Scheme> Tree<S> {
     ///
     /// Note that this function will probably not do the right thing for any extension
     /// configuration that does not either prohibit extensions or require a fixed extension.
-    pub fn open_file(&self, name: &S::Name) -> Result<Option<File>, Error> {
+    pub fn open_file(&self, name: S::NameRef<'_>) -> Result<Option<File>, Error> {
         let path = self.path(name).map_err(Error::InvalidName)?;
 
         match File::open(&path) {
@@ -104,7 +104,7 @@ impl<S: scheme::Scheme> Tree<S> {
     ///
     /// Note that this function will probably not do the right thing for any extension
     /// configuration that does not either prohibit extensions or require a fixed extension.
-    pub fn create_file(&self, name: &S::Name) -> Result<Option<File>, Error> {
+    pub fn create_file(&self, name: S::NameRef<'_>) -> Result<Option<File>, Error> {
         let path = self.path(name).map_err(Error::InvalidName)?;
 
         if let Some(parent) = path.parent() {
@@ -195,7 +195,7 @@ mod tests {
             .with_prefix_part_lengths([2, 2])
             .build()?;
 
-        let path = tree.path(&"abcdef".to_string())?;
+        let path = tree.path("abcdef")?;
         assert!(path.to_string_lossy().ends_with("/ab/cd/abcdef"));
 
         Ok(())
@@ -210,7 +210,7 @@ mod tests {
             .build()?;
 
         // Name length (3) equals prefix total (3).
-        let path = tree.path(&"abc".to_string())?;
+        let path = tree.path("abc")?;
         assert!(path.to_string_lossy().ends_with("/ab/c/abc"));
 
         Ok(())
@@ -226,7 +226,7 @@ mod tests {
             .unwrap();
 
         // Name length (3) is less than prefix total (4).
-        let result = tree.path(&"abc".to_string());
+        let result = tree.path("abc");
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "abc");
     }
@@ -238,7 +238,7 @@ mod tests {
             .with_scheme(scheme::Utf8)
             .build()?;
 
-        let result = tree.open_file(&"nonexistent".to_string())?;
+        let result = tree.open_file("nonexistent")?;
         assert!(
             result.is_none(),
             "Should return `Ok(None)` for nonexistent file"
@@ -281,9 +281,7 @@ mod tests {
             .build()?;
 
         // Create a file, which will create directory `ab`.
-        let mut file = tree
-            .create_file(&"abcd".to_string())?
-            .expect("Failed to create");
+        let mut file = tree.create_file("abcd")?.expect("Failed to create");
         file.write_all(b"test")?;
         drop(file);
 
@@ -455,7 +453,7 @@ mod tests {
             .with_prefix_part_lengths([])
             .build()?;
 
-        let path = tree.path(&"filename".to_string())?;
+        let path = tree.path("filename")?;
         assert!(path.to_string_lossy().ends_with("/filename"));
         assert!(!path.to_string_lossy().contains("//"));
 
@@ -473,9 +471,7 @@ mod tests {
         // Create some files.
         let names = vec!["aaa", "abc", "bcd", "bbb"];
         for name in &names {
-            let mut file = tree
-                .create_file(&(*name).to_string())?
-                .expect("create failed");
+            let mut file = tree.create_file(name)?.expect("create failed");
             file.write_all(name.as_bytes())?;
             drop(file);
         }
@@ -505,10 +501,10 @@ mod tests {
             .with_extension("txt")
             .build()?;
 
-        let file = tree.open_file(&"01234567".to_string())?;
+        let file = tree.open_file("01234567")?;
         assert!(file.is_some());
 
-        let file = tree.open_file(&"98765432".to_string())?;
+        let file = tree.open_file("98765432")?;
         assert!(file.is_some());
 
         let entries: Vec<_> = tree.entries().collect::<Result<Vec<_>, _>>()?;
@@ -567,10 +563,10 @@ mod tests {
             .with_extension("txt")
             .build()?;
 
-        let file = tree.open_file(&"01234567".to_string())?;
+        let file = tree.open_file("01234567")?;
         assert!(file.is_some());
 
-        let file = tree.open_file(&"98765432".to_string())?;
+        let file = tree.open_file("98765432")?;
         assert!(file.is_none());
 
         let entries = tree.entries().collect::<Result<Vec<_>, _>>();

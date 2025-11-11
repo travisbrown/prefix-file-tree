@@ -26,13 +26,14 @@ pub enum Case {
 
 pub trait Scheme {
     type Name;
+    type NameRef<'a>;
 
     #[must_use]
     fn fixed_length() -> Option<usize> {
         None
     }
 
-    fn name_to_string<'a>(&self, name: &'a Self::Name) -> Cow<'a, str>;
+    fn name_to_string<'a>(&self, name: Self::NameRef<'a>) -> Cow<'a, str>;
     fn name_from_file_stem(&self, file_stem: &OsStr) -> Result<Self::Name, Error>;
 
     fn cmp_prefix_part(&self, a: &OsStr, b: &OsStr) -> Result<Ordering, Error> {
@@ -45,9 +46,10 @@ pub struct Identity;
 
 impl Scheme for Identity {
     type Name = OsString;
+    type NameRef<'a> = &'a OsStr;
 
-    fn name_to_string<'a>(&self, name: &'a Self::Name) -> Cow<'a, str> {
-        name.as_os_str().to_string_lossy()
+    fn name_to_string<'a>(&self, name: Self::NameRef<'a>) -> Cow<'a, str> {
+        name.to_string_lossy()
     }
 
     fn name_from_file_stem(&self, file_stem: &OsStr) -> Result<Self::Name, Error> {
@@ -60,8 +62,9 @@ pub struct Utf8;
 
 impl Scheme for Utf8 {
     type Name = String;
+    type NameRef<'a> = &'a str;
 
-    fn name_to_string<'a>(&self, name: &'a Self::Name) -> Cow<'a, str> {
+    fn name_to_string<'a>(&self, name: Self::NameRef<'a>) -> Cow<'a, str> {
         name.into()
     }
 
