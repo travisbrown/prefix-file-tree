@@ -39,10 +39,14 @@ pub struct Tree<S> {
 }
 
 impl<S: scheme::Scheme> Tree<S> {
-    pub fn path(&self, name: &S::Name) -> Result<PathBuf, String> {
+    /// Return the path through the tree for the given name.
+    ///
+    /// Note that this function ignores any configured extension constraint, or any extension at
+    /// for a file with this file stem at the specified directory.
+    fn name_path(&self, name: &S::Name) -> Result<PathBuf, String> {
         let name_string = self.scheme.name_to_string(name);
 
-        if name_string.len() >= self.prefix_part_lengths_total() {
+        if name_string.len() >= self.prefix_part_lengths_total().max(1) {
             let mut name_remaining = name_string.as_ref();
             let mut path = self.base.clone();
 
@@ -61,10 +65,25 @@ impl<S: scheme::Scheme> Tree<S> {
         }
     }
 
+    /// Return the path through the tree for the given name, including any fixed extension.
+    pub fn path(&self, name: &S::Name) -> Result<PathBuf, String> {
+        let mut name_path = self.name_path(name)?;
+
+        if let Some(constraint::Extension::Fixed(extension)) = &self.extension_constraint {
+            name_path.add_extension(extension);
+        }
+
+        Ok(name_path)
+    }
+
     fn prefix_part_lengths_total(&self) -> usize {
         self.prefix_part_lengths.iter().sum()
     }
 
+    /// Try to open a file for reading for the given name, including any fixed extension.
+    ///
+    /// Note that this function will probably not do the right thing for any extension
+    /// configuration that does not either prohibit extensions or require a fixed extension.
     pub fn open_file(&self, name: &S::Name) -> Result<Option<File>, Error> {
         let path = self.path(name).map_err(Error::InvalidName)?;
 
@@ -81,6 +100,10 @@ impl<S: scheme::Scheme> Tree<S> {
         }
     }
 
+    /// Try to create a file for writing for the given name, including any fixed extension.
+    ///
+    /// Note that this function will probably not do the right thing for any extension
+    /// configuration that does not either prohibit extensions or require a fixed extension.
     pub fn create_file(&self, name: &S::Name) -> Result<Option<File>, Error> {
         let path = self.path(name).map_err(Error::InvalidName)?;
 
@@ -468,6 +491,98 @@ mod tests {
                 entry_names.contains(&(*name).to_string()),
                 "Should contain {name}"
             );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_example_with_fixed_extension() -> Result<(), Box<dyn std::error::Error>> {
+        let tree = Tree::builder("examples/extensions/fixed-01/")
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([2, 2, 2])
+            .with_length(8)
+            .with_extension("txt")
+            .build()?;
+
+        let file = tree.open_file(&"01234567".to_string())?;
+        assert!(file.is_some());
+
+        let file = tree.open_file(&"98765432".to_string())?;
+        assert!(file.is_some());
+
+        let entries: Vec<_> = tree.entries().collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(entries.len(), 2, "Should find both files");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_example_with_mixed_extensions_and_no_constraint()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tree = Tree::builder("examples/extensions/mixed-01/")
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([2, 2, 2])
+            .with_length(8)
+            .build()?;
+
+        let entries: Vec<_> = tree.entries().collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(entries.len(), 2, "Should find both files");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_example_with_mixed_extensions_and_any_constraint_fails()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tree = Tree::builder("examples/extensions/mixed-01/")
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([2, 2, 2])
+            .with_length(8)
+            .with_any_extension()
+            .build()?;
+
+        let entries = tree.entries().collect::<Result<Vec<_>, _>>();
+
+        match entries {
+            Err(super::iter::Error::InvalidExtension(None)) => {}
+            Err(error) => {
+                panic!("Unexpected error: {error:?}");
+            }
+            Ok(_) => {
+                panic!("Expected error on missing extension");
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_example_with_mixed_extensions_and_fixed_constraint_fails()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tree = Tree::builder("examples/extensions/mixed-01/")
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([2, 2, 2])
+            .with_length(8)
+            .with_extension("txt")
+            .build()?;
+
+        let file = tree.open_file(&"01234567".to_string())?;
+        assert!(file.is_some());
+
+        let file = tree.open_file(&"98765432".to_string())?;
+        assert!(file.is_none());
+
+        let entries = tree.entries().collect::<Result<Vec<_>, _>>();
+
+        match entries {
+            Err(super::iter::Error::InvalidExtension(None)) => {}
+            Err(error) => {
+                panic!("Unexpected error: {error:?}");
+            }
+            Ok(_) => {
+                panic!("Expected error on missing extension");
+            }
         }
 
         Ok(())

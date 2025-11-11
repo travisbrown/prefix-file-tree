@@ -71,7 +71,40 @@ impl<S> TreeBuilder<S> {
     }
 
     #[must_use]
-    pub fn with_fixed_length(self, length: usize) -> Self {
+    pub fn with_no_extension(self) -> Self {
+        Self {
+            base: self.base,
+            length_constraint: self.length_constraint,
+            extension_constraint: Some(crate::constraint::Extension::None),
+            prefix_part_lengths: self.prefix_part_lengths,
+            scheme: self.scheme,
+        }
+    }
+
+    #[must_use]
+    pub fn with_extension<E: Into<String>>(self, extension: E) -> Self {
+        Self {
+            base: self.base,
+            length_constraint: self.length_constraint,
+            extension_constraint: Some(crate::constraint::Extension::Fixed(extension.into())),
+            prefix_part_lengths: self.prefix_part_lengths,
+            scheme: self.scheme,
+        }
+    }
+
+    #[must_use]
+    pub fn with_any_extension(self) -> Self {
+        Self {
+            base: self.base,
+            length_constraint: self.length_constraint,
+            extension_constraint: Some(crate::constraint::Extension::Any),
+            prefix_part_lengths: self.prefix_part_lengths,
+            scheme: self.scheme,
+        }
+    }
+
+    #[must_use]
+    pub fn with_length(self, length: usize) -> Self {
         Self {
             base: self.base,
             length_constraint: Some(length.into()),
