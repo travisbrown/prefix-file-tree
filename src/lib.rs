@@ -17,6 +17,8 @@ pub enum Error {
     ExpectedFile(PathBuf),
     #[error("Expected directory")]
     ExpectedDirectory(PathBuf),
+    #[error("Invalid file")]
+    InvalidFile(PathBuf),
     #[error("Invalid directory")]
     InvalidDirectory(PathBuf),
     #[error("Invalid name")]
@@ -36,6 +38,29 @@ pub struct Tree<S> {
     extension_constraint: Option<constraint::Extension>,
     prefix_part_lengths: Vec<usize>,
     scheme: S,
+}
+
+impl<S> Tree<S> {
+    /// Open a tree with an inferred prefix part structure and extension constraint.
+    ///
+    /// The result will be empty if and only if the store has no files (even if there are directories).
+    ///
+    /// See the `infer_prefix_part_lengths` and `infer_extension_constraint` functions for
+    /// important qualifications.
+    pub fn open_inferred<P: AsRef<Path>>(base: P, scheme: S) -> Result<Option<Self>, Error> {
+        let prefix_part_lengths = Tree::infer_prefix_part_lengths(&base)?;
+        let extension_constraint = Tree::infer_extension_constraint(&base)?;
+
+        Ok(prefix_part_lengths.zip(extension_constraint).map(
+            |(prefix_part_lengths, extension_constraint)| Self {
+                base: base.as_ref().to_path_buf(),
+                length_constraint: None,
+                extension_constraint: Some(extension_constraint),
+                prefix_part_lengths,
+                scheme,
+            },
+        ))
+    }
 }
 
 impl<S: scheme::Scheme> Tree<S> {
@@ -178,6 +203,45 @@ impl Tree<scheme::Identity> {
             next.map_or(Ok(true), |next| {
                 Self::infer_prefix_part_lengths_rec(next, acc)
             })
+        }
+    }
+
+    /// Infer the extension constraint used to create a store.
+    ///
+    /// The result will be empty if and only if the store has no files (even if there are directories).
+    ///
+    /// This function can only infer the extension constraint if it either prohibits extensions or
+    /// requires all files to have the same extension.
+    pub fn infer_extension_constraint<P: AsRef<Path>>(
+        base: P,
+    ) -> Result<Option<constraint::Extension>, Error> {
+        Self::infer_extension_constraint_rec(base)
+    }
+
+    pub fn infer_extension_constraint_rec<P: AsRef<Path>>(
+        current: P,
+    ) -> Result<Option<constraint::Extension>, Error> {
+        if current.as_ref().is_file() {
+            match current.as_ref().extension() {
+                None => Ok(Some(constraint::Extension::None)),
+                Some(extension) => {
+                    let extension = extension
+                        .to_str()
+                        .ok_or_else(|| Error::InvalidFile(current.as_ref().to_path_buf()))?;
+
+                    Ok(Some(constraint::Extension::Fixed(extension.to_string())))
+                }
+            }
+        } else {
+            for result in std::fs::read_dir(current)? {
+                let entry = result?;
+
+                if let Some(constraint) = Self::infer_extension_constraint(entry.path())? {
+                    return Ok(Some(constraint));
+                }
+            }
+
+            Ok(None)
         }
     }
 }
@@ -580,6 +644,36 @@ mod tests {
                 panic!("Expected error on missing extension");
             }
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_inferred_with_fixed_extension() -> Result<(), Box<dyn std::error::Error>> {
+        let tree = Tree::open_inferred("examples/extensions/fixed-01/", scheme::Utf8)?
+            .expect("Expected at least one file");
+
+        assert_eq!(tree.prefix_part_lengths, vec![2, 2, 2]);
+
+        assert_eq!(
+            tree.extension_constraint,
+            Some(crate::constraint::Extension::Fixed("txt".to_string()))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_inferred_with_no_extension() -> Result<(), Box<dyn std::error::Error>> {
+        let tree = Tree::open_inferred("examples/extensions/none-01/", scheme::Utf8)?
+            .expect("Expected at least one file");
+
+        assert_eq!(tree.prefix_part_lengths, vec![2, 2, 2]);
+
+        assert_eq!(
+            tree.extension_constraint,
+            Some(crate::constraint::Extension::None)
+        );
 
         Ok(())
     }
