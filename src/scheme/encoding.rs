@@ -6,16 +6,18 @@ use std::ffi::OsStr;
 
 /// Fixed-length Base32 name encoding scheme.
 ///
-/// Note that padding is not handled, and if `N` is not a multiple of 5, you will always get errors
-/// during validation.
-#[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
+/// Note that padding is not handled, and that `N` must be a multiple of 5.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Base32<const N: usize> {
     pub case: Case,
 }
 
 impl<const N: usize> Base32<N> {
+    const VALID: () = assert!(N.is_multiple_of(5), "N must be a multiple of 5 for Base32 encoding");
+
     #[must_use]
     pub const fn new(case: Case) -> Self {
+        let () = Self::VALID;
         Self { case }
     }
 }
@@ -49,9 +51,10 @@ impl<const N: usize> Scheme for Base32<N> {
     }
 
     fn name_from_file_stem(&self, file_stem: &OsStr) -> Result<Self::Name, Error> {
+        let () = Self::VALID;
         let as_bytes = file_stem.as_encoded_bytes();
 
-        if N.is_multiple_of(5) && as_bytes.len() == N / 5 * 8 {
+        if as_bytes.len() == N / 5 * 8 {
             let decoded = BASE32
                 .decode(as_bytes)
                 .map_err(|error| Error::InvalidByte(as_bytes[error.position]))?;
@@ -99,7 +102,9 @@ mod tests {
         let name_3 = b"abcd_abcd_abcd_efgh_";
 
         let tree = Tree::builder(base)
-            .with_scheme(crate::scheme::encoding::Base32::<20>::default())
+            .with_scheme(crate::scheme::encoding::Base32::<20>::new(
+                crate::scheme::Case::Lower,
+            ))
             .with_prefix_part_lengths(prefix_part_lengths)
             .build()?;
 
