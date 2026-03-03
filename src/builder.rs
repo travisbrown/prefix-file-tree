@@ -42,17 +42,19 @@ impl<S> TreeBuilder<S> {
                 let prefix_part_lengths_total =
                     tree.prefix_part_lengths.iter().copied().sum::<usize>();
 
-                match length_constraint {
-                    constraint::Length::Fixed(length) | constraint::Length::Range(_, length) => {
-                        if prefix_part_lengths_total <= length {
-                            Ok(tree)
-                        } else {
-                            Err(Error::InconsistentPrefixPartLengths {
-                                prefix_part_lengths_total,
-                                length_constraint,
-                            })
-                        }
-                    }
+                // For a range, the prefix total must fit within the minimum valid name length.
+                let threshold = match length_constraint {
+                    constraint::Length::Fixed(length) => length,
+                    constraint::Length::Range(minimum, _) => minimum,
+                };
+
+                if prefix_part_lengths_total <= threshold {
+                    Ok(tree)
+                } else {
+                    Err(Error::InconsistentPrefixPartLengths {
+                        prefix_part_lengths_total,
+                        length_constraint,
+                    })
                 }
             }
             None => Ok(tree),
@@ -131,5 +133,59 @@ impl<S> TreeBuilder<S> {
             prefix_part_lengths: self.prefix_part_lengths,
             scheme,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Tree, scheme};
+
+    #[test]
+    fn test_range_constraint_rejects_when_prefix_total_exceeds_minimum() {
+        let base = tempfile::tempdir().unwrap();
+        let result = Tree::builder(base.path())
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([3])
+            .with_length_range(2..10)
+            .build();
+
+        assert_eq!(
+            result,
+            Err(Error::InconsistentPrefixPartLengths {
+                prefix_part_lengths_total: 3,
+                length_constraint: constraint::Length::Range(2, 10),
+            })
+        );
+    }
+
+    #[test]
+    fn test_range_constraint_accepts_when_prefix_total_equals_minimum() {
+        let base = tempfile::tempdir().unwrap();
+        let result = Tree::builder(base.path())
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([2])
+            .with_length_range(2..10)
+            .build();
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_constraint_still_rejects_when_prefix_total_exceeds_length() {
+        let base = tempfile::tempdir().unwrap();
+        let result = Tree::builder(base.path())
+            .with_scheme(scheme::Utf8)
+            .with_prefix_part_lengths([3])
+            .with_length(2)
+            .build();
+
+        assert_eq!(
+            result,
+            Err(Error::InconsistentPrefixPartLengths {
+                prefix_part_lengths_total: 3,
+                length_constraint: constraint::Length::Fixed(2),
+            })
+        );
     }
 }
