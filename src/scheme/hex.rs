@@ -112,7 +112,7 @@ const fn is_valid_character_byte(case: Case, c: u8) -> bool {
 }
 
 fn bytes_to_string<B: AsRef<[u8]>>(case: Case, bytes: B) -> String {
-    let mut result = String::new();
+    let mut result = String::with_capacity(bytes.as_ref().len() * 2);
 
     for byte in bytes.as_ref() {
         if case == Case::Upper {
