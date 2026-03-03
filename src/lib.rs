@@ -114,7 +114,8 @@ impl<S: scheme::Scheme> Tree<S> {
 
         match File::open(&path) {
             Ok(file) => {
-                if path.is_file() {
+                // Query metadata via the open file descriptor.
+                if file.metadata()?.file_type().is_file() {
                     Ok(Some(file))
                 } else {
                     Err(Error::ExpectedFile(path))
