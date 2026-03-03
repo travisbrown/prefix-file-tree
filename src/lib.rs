@@ -218,7 +218,7 @@ impl Tree<scheme::Identity> {
         Self::infer_extension_constraint_rec(base)
     }
 
-    pub fn infer_extension_constraint_rec<P: AsRef<Path>>(
+    fn infer_extension_constraint_rec<P: AsRef<Path>>(
         current: P,
     ) -> Result<Option<constraint::Extension>, Error> {
         if current.as_ref().is_file() {
