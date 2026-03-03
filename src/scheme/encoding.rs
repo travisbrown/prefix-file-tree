@@ -13,7 +13,10 @@ pub struct Base32<const N: usize> {
 }
 
 impl<const N: usize> Base32<N> {
-    const VALID: () = assert!(N.is_multiple_of(5), "N must be a multiple of 5 for Base32 encoding");
+    const VALID: () = assert!(
+        N.is_multiple_of(5),
+        "N must be a multiple of 5 for Base32 encoding"
+    );
 
     #[must_use]
     pub const fn new(case: Case) -> Self {
