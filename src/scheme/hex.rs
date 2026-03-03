@@ -35,7 +35,7 @@ impl<const N: usize> Scheme for Hex<N> {
 
             for i in 0..N {
                 name[i] = u8::from_str_radix(&as_str[i * 2..i * 2 + 2], 16).map_err(|_| {
-                    let invalid_byte = first_invalid_byte(self.case, &as_str[i..i + 2]);
+                    let invalid_byte = first_invalid_byte(self.case, &as_str[i * 2..i * 2 + 2]);
 
                     // This is safe given the contract of `from_str_radix` and our `first_invalid_character`.
                     Error::InvalidByte(
@@ -280,5 +280,18 @@ mod tests {
         test_hex(vec![19, 13])?;
 
         Ok(())
+    }
+
+    #[test]
+    fn test_name_from_file_stem_invalid_byte_past_first_pair() {
+        // Regression test for the bug where the error path used `as_str[i..i + 2]`
+        // instead of `as_str[i * 2..i * 2 + 2]`.
+        use crate::scheme::Scheme;
+        use std::ffi::OsStr;
+
+        let scheme = super::Hex::<3>::default(); // Case::Lower
+        let result = scheme.name_from_file_stem(OsStr::new("1a2bXc"));
+
+        assert_eq!(result, Err(crate::scheme::Error::InvalidByte(b'X')));
     }
 }
