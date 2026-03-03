@@ -73,66 +73,48 @@ impl<S> TreeBuilder<S> {
     #[must_use]
     pub fn with_no_extension(self) -> Self {
         Self {
-            base: self.base,
-            length_constraint: self.length_constraint,
             extension_constraint: Some(crate::constraint::Extension::None),
-            prefix_part_lengths: self.prefix_part_lengths,
-            scheme: self.scheme,
+            ..self
         }
     }
 
     #[must_use]
     pub fn with_extension<E: Into<String>>(self, extension: E) -> Self {
         Self {
-            base: self.base,
-            length_constraint: self.length_constraint,
             extension_constraint: Some(crate::constraint::Extension::Fixed(extension.into())),
-            prefix_part_lengths: self.prefix_part_lengths,
-            scheme: self.scheme,
+            ..self
         }
     }
 
     #[must_use]
     pub fn with_any_extension(self) -> Self {
         Self {
-            base: self.base,
-            length_constraint: self.length_constraint,
             extension_constraint: Some(crate::constraint::Extension::Any),
-            prefix_part_lengths: self.prefix_part_lengths,
-            scheme: self.scheme,
+            ..self
         }
     }
 
     #[must_use]
     pub fn with_length(self, length: usize) -> Self {
         Self {
-            base: self.base,
             length_constraint: Some(length.into()),
-            extension_constraint: self.extension_constraint,
-            prefix_part_lengths: self.prefix_part_lengths,
-            scheme: self.scheme,
+            ..self
         }
     }
 
     #[must_use]
     pub fn with_length_range(self, range: Range<usize>) -> Self {
         Self {
-            base: self.base,
             length_constraint: Some(range.into()),
-            extension_constraint: self.extension_constraint,
-            prefix_part_lengths: self.prefix_part_lengths,
-            scheme: self.scheme,
+            ..self
         }
     }
 
     #[must_use]
     pub fn with_prefix_part_lengths<T: AsRef<[usize]>>(self, prefix_part_lengths: T) -> Self {
         Self {
-            base: self.base,
-            length_constraint: self.length_constraint,
-            extension_constraint: self.extension_constraint,
             prefix_part_lengths: Some(prefix_part_lengths.as_ref().to_vec()),
-            scheme: self.scheme,
+            ..self
         }
     }
 
