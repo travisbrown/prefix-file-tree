@@ -38,19 +38,19 @@ impl<const N: usize> Scheme for Base32<N> {
     }
 
     fn cmp_prefix_part(&self, a: &OsStr, b: &OsStr) -> Result<Ordering, Error> {
-        let a_chars = a
-            .as_encoded_bytes()
-            .iter()
-            .map(|byte| Base32Char::try_from(*byte))
-            .collect::<Result<Vec<_>, _>>()?;
+        let a_bytes = a.as_encoded_bytes();
+        let b_bytes = b.as_encoded_bytes();
 
-        let b_chars = b
-            .as_encoded_bytes()
-            .iter()
-            .map(|byte| Base32Char::try_from(*byte))
-            .collect::<Result<Vec<_>, _>>()?;
+        for (a_byte, b_byte) in a_bytes.iter().zip(b_bytes.iter()) {
+            match Base32Char::try_from(*a_byte)?.cmp(&Base32Char::try_from(*b_byte)?) {
+                Ordering::Equal => {}
+                other => {
+                    return Ok(other);
+                }
+            }
+        }
 
-        Ok(a_chars.cmp(&b_chars))
+        Ok(a_bytes.len().cmp(&b_bytes.len()))
     }
 
     fn name_from_file_stem(&self, file_stem: &OsStr) -> Result<Self::Name, Error> {
